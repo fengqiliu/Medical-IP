@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/medical360
     username: postgres
-    password: postgres
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   data:
     redis:
@@ -20,7 +20,8 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 jwt:
-  secret: medical360-secret-key-change-in-production
+  secret: ${JWT_SECRET:medical360-dev-secret}
+  # JWT expiration time in milliseconds (86400000ms = 24 hours)
   expiration: 86400000
 
 ai-service:

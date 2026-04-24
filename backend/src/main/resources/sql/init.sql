@@ -153,9 +153,13 @@ CREATE TABLE access_log (
 
 -- 索引
 CREATE INDEX idx_patient_unified_id ON patient(unified_patient_id);
+CREATE INDEX idx_encounter_patient ON encounter(patient_id);
 CREATE INDEX idx_lab_order_patient ON lab_order(patient_id);
+CREATE INDEX idx_lab_order_encounter ON lab_order(encounter_id);
 CREATE INDEX idx_imaging_order_patient ON imaging_order(patient_id);
+CREATE INDEX idx_imaging_order_encounter ON imaging_order(encounter_id);
 CREATE INDEX idx_clinical_event_patient ON clinical_event(patient_id);
+CREATE INDEX idx_clinical_event_reference ON clinical_event(reference_id);
 CREATE INDEX idx_clinical_event_datetime ON clinical_event(event_datetime DESC);
 CREATE INDEX idx_access_log_user ON access_log(user_id);
 CREATE INDEX idx_access_log_patient ON access_log(patient_id);
