@@ -2,6 +2,7 @@ package com.medical360.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,14 @@ public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
     private String jwtSecret;
+
+    @PostConstruct
+    public void validateSecretKey() {
+        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 256 bits (32 bytes)");
+        }
+    }
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;

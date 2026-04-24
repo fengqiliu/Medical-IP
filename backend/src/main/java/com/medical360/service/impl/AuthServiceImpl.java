@@ -24,10 +24,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String login(String username, String password) {
         User user = userMapper.selectByUsername(username);
-        if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
+
+        // Always perform dummy comparison to normalize timing
+        String dummyHash = "$2a$10$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.AKjB4PH.MGiC2y";
+        if (user == null) {
+            // Still perform BCrypt comparison to prevent timing attack
+            passwordEncoder.matches(password, dummyHash);
             throw new RuntimeException("用户名或密码错误");
         }
-        if (!user.getEnabled()) {
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("用户名或密码错误");
+        }
+
+        if (Boolean.FALSE.equals(user.getEnabled())) {
             throw new RuntimeException("账号已被禁用");
         }
 
