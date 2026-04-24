@@ -29,6 +29,9 @@ Thumbs.db
 # IDE (VSCode)
 .vscode/settings.json
 
+# Claude Code
+.claude/
+
 # Environment
 .env
 .env.local
