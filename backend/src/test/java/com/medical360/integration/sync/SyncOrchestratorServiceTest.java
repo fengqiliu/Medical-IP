@@ -192,13 +192,13 @@ class SyncOrchestratorServiceTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(Map.of("id", 11L, "unifiedPatientId", "P11", "name", "更新后患者")),
+                List.of(Map.of("id", 11L, "name", "更新后患者")),
                 List.of(Map.of("id", 21L, "patientId", 11L, "encounterType", "住院"))
             ));
         Patient existingPatient = new Patient();
         existingPatient.setId(100L);
         existingPatient.setEmrPatientId(11L);
-        existingPatient.setUnifiedPatientId("P11");
+        existingPatient.setUnifiedPatientId("REAL-123");
         when(patientMapper.selectOne(any())).thenReturn(existingPatient);
         Encounter existingEncounter = new Encounter();
         existingEncounter.setId(200L);
@@ -216,9 +216,50 @@ class SyncOrchestratorServiceTest {
         verify(encounterMapper).updateById(encounterCaptor.capture());
         assertThat(patientCaptor.getValue().getId()).isEqualTo(100L);
         assertThat(patientCaptor.getValue().getEmrPatientId()).isEqualTo(11L);
+        assertThat(patientCaptor.getValue().getUnifiedPatientId()).isEqualTo("REAL-123");
         assertThat(encounterCaptor.getValue().getId()).isEqualTo(200L);
         assertThat(encounterCaptor.getValue().getEmrEncounterId()).isEqualTo(21L);
         assertThat(encounterCaptor.getValue().getPatientId()).isEqualTo(100L);
+    }
+
+    @Test
+    void shouldContinueSyncWhenMalformedExternalPatientIdIsEncountered() {
+        when(emrAdapter.getSourceType()).thenReturn("EMR");
+        when(emrAdapter.fetchLabOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchLabResults(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingReports(null)).thenReturn(List.of());
+        when(emrAdapter.fetchPatients(null)).thenReturn(List.of(Map.of("PATIENT_ID", "abc"), Map.of("PATIENT_ID", "11")));
+        when(emrAdapter.fetchEncounters(null)).thenReturn(List.of(Map.of("ENCOUNTER_ID", "21", "patientId", 11L)));
+        when(dataStandardizer.normalize(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new NormalizedSyncPayload(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                    Map.of("id", "abc", "name", "坏数据"),
+                    Map.of("id", 11L, "unifiedPatientId", "P11", "name", "李四")
+                ),
+                List.of(Map.of("id", 21L, "patientId", 11L, "encounterType", "门诊"))
+            ));
+        when(patientMapper.selectOne(any())).thenReturn(null);
+        when(encounterMapper.selectOne(any())).thenReturn(null);
+        doAnswer(invocation -> {
+            Patient patient = invocation.getArgument(0);
+            patient.setId(101L);
+            return 1;
+        }).when(patientMapper).insert(any(Patient.class));
+
+        orchestratorService.syncSource(emrAdapter, null);
+
+        verify(patientMapper, times(1)).insert(any(Patient.class));
+        verify(encounterMapper).insert(any(Encounter.class));
+        ArgumentCaptor<DataSyncLog> logCaptor = ArgumentCaptor.forClass(DataSyncLog.class);
+        verify(dataSyncLogMapper).insert(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("PARTIAL_FAILED");
+        assertThat(logCaptor.getValue().getErrorMessage()).contains("externalId=abc");
+        assertThat(logCaptor.getValue().getSyncedCount()).isEqualTo(2);
     }
 
 

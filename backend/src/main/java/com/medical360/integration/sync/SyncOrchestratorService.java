@@ -99,16 +99,19 @@ public class SyncOrchestratorService {
             try {
                 Patient patient = toPatient(record);
                 Long sourcePatientId = patient.getEmrPatientId();
+                Patient existing = findExistingPatient(patient);
                 if (!hasText(patient.getUnifiedPatientId())) {
-                    if (sourcePatientId == null) {
+                    if (existing != null && hasText(existing.getUnifiedPatientId())) {
+                        patient.setUnifiedPatientId(existing.getUnifiedPatientId());
+                    } else if (sourcePatientId != null) {
+                        patient.setUnifiedPatientId(buildFallbackUnifiedPatientId(sourcePatientId));
+                    } else {
                         String error = "patient externalId=null: missing unifiedPatientId and external patient id";
                         log.warn("Skipping EMR patient sync because both identifiers are missing");
                         errors.add(error);
                         continue;
                     }
-                    patient.setUnifiedPatientId(buildFallbackUnifiedPatientId(sourcePatientId));
                 }
-                Patient existing = findExistingPatient(patient);
                 if (existing == null) {
                     patient.setId(null);
                     patientMapper.insert(patient);
@@ -124,7 +127,7 @@ public class SyncOrchestratorService {
                 }
                 syncedCount++;
             } catch (Exception e) {
-                Long sourcePatientId = getLong(record, "id");
+                String sourcePatientId = getExternalId(record, "id");
                 log.warn("Skipping EMR patient sync, patientId={}, reason={}", sourcePatientId, e.getMessage());
                 errors.add("patient externalId=" + sourcePatientId + ": " + e.getMessage());
             }
@@ -185,7 +188,7 @@ public class SyncOrchestratorService {
                 }
                 syncedCount++;
             } catch (Exception e) {
-                Long sourceEncounterId = getLong(record, "id");
+                String sourceEncounterId = getExternalId(record, "id");
                 log.warn("Skipping EMR encounter sync, encounterId={}, reason={}", sourceEncounterId, e.getMessage());
                 errors.add("encounter externalId=" + sourceEncounterId + ": " + e.getMessage());
             }
@@ -258,6 +261,11 @@ public class SyncOrchestratorService {
             return number.longValue();
         }
         return Long.parseLong(value.toString());
+    }
+
+    private String getExternalId(Map<String, Object> record, String key) {
+        Object value = record.get(key);
+        return value == null ? null : value.toString();
     }
 
     private String getString(Map<String, Object> record, String key) {
