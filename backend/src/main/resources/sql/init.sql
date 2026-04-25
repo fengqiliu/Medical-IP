@@ -151,6 +151,18 @@ CREATE TABLE access_log (
     access_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 数据同步日志
+CREATE TABLE data_sync_log (
+    id BIGSERIAL PRIMARY KEY,
+    source_type VARCHAR(20) NOT NULL,
+    data_type VARCHAR(20),
+    last_sync_time VARCHAR(50),
+    synced_count INTEGER DEFAULT 0,
+    status VARCHAR(20),
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 索引
 CREATE INDEX idx_patient_unified_id ON patient(unified_patient_id);
 CREATE INDEX idx_encounter_patient ON encounter(patient_id);
@@ -163,6 +175,7 @@ CREATE INDEX idx_clinical_event_reference ON clinical_event(reference_id);
 CREATE INDEX idx_clinical_event_datetime ON clinical_event(event_datetime DESC);
 CREATE INDEX idx_access_log_user ON access_log(user_id);
 CREATE INDEX idx_access_log_patient ON access_log(patient_id);
+CREATE INDEX idx_data_sync_log_source ON data_sync_log(source_type);
 
 -- 添加测试用户（密码为 123456 的 BCrypt 哈希）
 INSERT INTO users (username, password, name, department_id, position_id, enabled)

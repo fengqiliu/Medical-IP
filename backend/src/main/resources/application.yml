@@ -11,6 +11,8 @@ spring:
     redis:
       host: localhost
       port: 6379
+  scheduling:
+    enabled: true
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -26,3 +28,12 @@ jwt:
 
 ai-service:
   base-url: http://localhost:8000
+
+lis-service:
+  base-url: ${LIS_SERVICE_BASE_URL:http://localhost:9000}
+ris-service:
+  base-url: ${RIS_SERVICE_BASE_URL:http://localhost:9001}
+pacs-service:
+  base-url: ${PACS_SERVICE_BASE_URL:http://localhost:9002}
+emr-service:
+  base-url: ${EMR_SERVICE_BASE_URL:http://localhost:9003}

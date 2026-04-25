@@ -14,11 +14,7 @@ public interface DataSourceAdapter {
 
     List<Map<String, Object>> fetchImagingReports(String lastSyncTime);
 
-    Map<String, Object> mapLabOrderFields(Map<String, Object> source);
+    List<Map<String, Object>> fetchPatients(String lastSyncTime);
 
-    Map<String, Object> mapLabResultFields(Map<String, Object> source);
-
-    Map<String, Object> mapImagingOrderFields(Map<String, Object> source);
-
-    Map<String, Object> mapImagingReportFields(Map<String, Object> source);
+    List<Map<String, Object>> fetchEncounters(String lastSyncTime);
 }

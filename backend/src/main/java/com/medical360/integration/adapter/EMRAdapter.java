@@ -1,45 +1,47 @@
 package com.medical360.integration.adapter;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @Component
-public class LISAdapter implements DataSourceAdapter {
+public class EMRAdapter implements DataSourceAdapter {
 
     @Override
     public String getSourceType() {
-        return "LIS";
+        return "EMR";
     }
 
     @Override
     public List<Map<String, Object>> fetchLabOrders(String lastSyncTime) {
-        // TODO: Implement actual LIS API call
-        return Collections.emptyList();
+        return List.of();
     }
 
     @Override
     public List<Map<String, Object>> fetchLabResults(String lastSyncTime) {
-        return Collections.emptyList();
+        return List.of();
     }
 
     @Override
     public List<Map<String, Object>> fetchImagingOrders(String lastSyncTime) {
-        return Collections.emptyList();
+        return List.of();
     }
 
     @Override
     public List<Map<String, Object>> fetchImagingReports(String lastSyncTime) {
-        return Collections.emptyList();
+        return List.of();
     }
 
     @Override
     public List<Map<String, Object>> fetchPatients(String lastSyncTime) {
-        return Collections.emptyList();
+        return List.of();
     }
 
     @Override
     public List<Map<String, Object>> fetchEncounters(String lastSyncTime) {
-        return Collections.emptyList();
+        return List.of();
     }
 }
