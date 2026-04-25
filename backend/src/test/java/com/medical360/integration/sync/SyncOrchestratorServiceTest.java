@@ -3,10 +3,13 @@ package com.medical360.integration.sync;
 import com.medical360.integration.adapter.DataSourceAdapter;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -14,11 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SyncOrchestratorServiceTest {
 
     @Test
-    void shouldSyncSpecifiedSourceAndReturnSuccessSummary() {
+    void shouldSyncSpecifiedSourceAndReturnSuccessSummary() throws Exception {
         DataSourceAdapter lisAdapter = new StubLisAdapter();
-        SyncOrchestratorService orchestrator = new SyncOrchestratorService(List.of(lisAdapter));
+        Object orchestrator = newSyncOrchestrator(List.of(lisAdapter));
 
-        Map<String, Object> result = orchestrator.syncSource("LIS", "2026-04-25T00:00:00");
+        Map<String, Object> result = invokeSyncSource(orchestrator, "LIS", "2026-04-25T00:00:00");
 
         assertEquals("LIS", result.get("sourceType"));
         assertEquals("SUCCESS", result.get("status"));
@@ -26,12 +29,12 @@ class SyncOrchestratorServiceTest {
     }
 
     @Test
-    void shouldContinueOtherSourcesWhenOneSourceFails() {
+    void shouldContinueOtherSourcesWhenOneSourceFails() throws Exception {
         DataSourceAdapter broken = new BrokenAdapter();
         DataSourceAdapter lisAdapter = new StubLisAdapter();
-        SyncOrchestratorService orchestrator = new SyncOrchestratorService(List.of(broken, lisAdapter));
+        Object orchestrator = newSyncOrchestrator(List.of(broken, lisAdapter));
 
-        List<Map<String, Object>> results = orchestrator.syncAllSources("2026-04-25T00:00:00");
+        List<Map<String, Object>> results = invokeSyncAllSources(orchestrator, "2026-04-25T00:00:00");
 
         assertEquals(2, results.size());
         assertTrue(results.stream().anyMatch(item -> "BROKEN".equals(item.get("sourceType")) && "FAILED".equals(item.get("status"))));
@@ -39,15 +42,37 @@ class SyncOrchestratorServiceTest {
     }
 
     @Test
-    void shouldReturnFailureWhenSourceTypeNotFound() {
+    void shouldReturnFailureWhenSourceTypeNotFound() throws Exception {
         DataSourceAdapter lisAdapter = new StubLisAdapter();
-        SyncOrchestratorService orchestrator = new SyncOrchestratorService(List.of(lisAdapter));
+        Object orchestrator = newSyncOrchestrator(List.of(lisAdapter));
 
-        Map<String, Object> result = orchestrator.syncSource("EMR", "2026-04-25T00:00:00");
+        Map<String, Object> result = invokeSyncSource(orchestrator, "EMR", "2026-04-25T00:00:00");
 
         assertEquals("EMR", result.get("sourceType"));
         assertEquals("FAILED", result.get("status"));
         assertFalse(String.valueOf(result.get("errorMessage")).isBlank());
+    }
+
+    private static Object newSyncOrchestrator(List<DataSourceAdapter> adapters) throws Exception {
+        Class<?> clazz = assertDoesNotThrow(
+                () -> Class.forName("com.medical360.integration.sync.SyncOrchestratorService"),
+                "SyncOrchestratorService class should exist in red phase runtime checks"
+        );
+        Constructor<?> constructor = clazz.getDeclaredConstructor(List.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(adapters);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> invokeSyncSource(Object target, String sourceType, String lastSyncTime) throws Exception {
+        Method method = target.getClass().getMethod("syncSource", String.class, String.class);
+        return (Map<String, Object>) method.invoke(target, sourceType, lastSyncTime);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> invokeSyncAllSources(Object target, String lastSyncTime) throws Exception {
+        Method method = target.getClass().getMethod("syncAllSources", String.class);
+        return (List<Map<String, Object>>) method.invoke(target, lastSyncTime);
     }
 
     private static class StubLisAdapter implements DataSourceAdapter {
