@@ -58,6 +58,7 @@ class DataStandardizerTest {
         );
 
         assertThat(payload.patients()).hasSize(1);
+        assertThat(payload.patients().get(0).get("id")).isEqualTo(11L);
         assertThat(payload.patients().get(0).get("name")).isEqualTo("王测试");
         assertThat(payload.patients().get(0).get("unifiedPatientId")).isEqualTo("P20240011");
     }
@@ -90,6 +91,7 @@ class DataStandardizerTest {
         assertThat(payload.patients()).hasSize(1);
         assertThat(payload.patients().get(0).get("birthDate")).isEqualTo(LocalDate.parse("1985-08-01"));
         assertThat(payload.encounters()).hasSize(1);
+        assertThat(payload.encounters().get(0).get("id")).isEqualTo(31L);
         assertThat(payload.encounters().get(0).get("visitDatetime")).isEqualTo(
             LocalDateTime.of(2026, 4, 25, 9, 30, 0)
         );

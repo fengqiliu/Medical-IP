@@ -69,6 +69,7 @@ public class FieldMappingService {
         EMR_ENCOUNTER_MAPPINGS.put("VISIT_TIME", "visitDatetime");
 
         VALUE_CONVERTERS.put("patientId", "Long");
+        VALUE_CONVERTERS.put("id", "Long");
         VALUE_CONVERTERS.put("labOrderId", "Long");
         VALUE_CONVERTERS.put("departmentId", "Long");
         VALUE_CONVERTERS.put("birthDate", "LocalDate");
