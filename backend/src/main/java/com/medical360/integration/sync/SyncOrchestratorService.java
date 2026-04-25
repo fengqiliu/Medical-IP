@@ -99,6 +99,15 @@ public class SyncOrchestratorService {
             try {
                 Patient patient = toPatient(record);
                 Long sourcePatientId = patient.getEmrPatientId();
+                if (!hasText(patient.getUnifiedPatientId())) {
+                    if (sourcePatientId == null) {
+                        String error = "patient externalId=null: missing unifiedPatientId and external patient id";
+                        log.warn("Skipping EMR patient sync because both identifiers are missing");
+                        errors.add(error);
+                        continue;
+                    }
+                    patient.setUnifiedPatientId(buildFallbackUnifiedPatientId(sourcePatientId));
+                }
                 Patient existing = findExistingPatient(patient);
                 if (existing == null) {
                     patient.setId(null);
@@ -151,6 +160,12 @@ public class SyncOrchestratorService {
             try {
                 Encounter encounter = toEncounter(record);
                 Long sourceEncounterId = encounter.getEmrEncounterId();
+                if (sourceEncounterId == null) {
+                    String error = "encounter externalId=null: missing external encounter id";
+                    log.warn("Skipping EMR encounter sync because external encounter id is missing");
+                    errors.add(error);
+                    continue;
+                }
                 Long sourcePatientId = encounter.getPatientId();
                 encounter.setPatientId(resolvePatientId(sourcePatientId, patientIdMappings));
                 if (encounter.getPatientId() == null) {
@@ -248,6 +263,10 @@ public class SyncOrchestratorService {
     private String getString(Map<String, Object> record, String key) {
         Object value = record.get(key);
         return value == null ? null : value.toString();
+    }
+
+    private String buildFallbackUnifiedPatientId(Long emrPatientId) {
+        return "EMR-PATIENT-" + emrPatientId;
     }
 
     private boolean hasText(String value) {

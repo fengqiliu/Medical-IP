@@ -141,6 +141,43 @@ class SyncOrchestratorServiceTest {
     }
 
     @Test
+    void shouldFallbackToExternalPatientIdWhenUnifiedIdIsMissing() {
+        when(emrAdapter.getSourceType()).thenReturn("EMR");
+        when(emrAdapter.fetchLabOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchLabResults(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingReports(null)).thenReturn(List.of());
+        when(emrAdapter.fetchPatients(null)).thenReturn(List.of(Map.of("PATIENT_ID", "11")));
+        when(emrAdapter.fetchEncounters(null)).thenReturn(List.of());
+        when(dataStandardizer.normalize(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new NormalizedSyncPayload(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(Map.of("id", 11L, "name", "外部患者")),
+                List.of()
+            ));
+        when(patientMapper.selectOne(any())).thenReturn(null);
+        doAnswer(invocation -> {
+            Patient patient = invocation.getArgument(0);
+            patient.setId(101L);
+            return 1;
+        }).when(patientMapper).insert(any(Patient.class));
+
+        orchestratorService.syncSource(emrAdapter, null);
+
+        ArgumentCaptor<Patient> patientCaptor = ArgumentCaptor.forClass(Patient.class);
+        ArgumentCaptor<DataSyncLog> logCaptor = ArgumentCaptor.forClass(DataSyncLog.class);
+        verify(patientMapper).insert(patientCaptor.capture());
+        verify(dataSyncLogMapper).insert(logCaptor.capture());
+        assertThat(patientCaptor.getValue().getUnifiedPatientId()).isEqualTo("EMR-PATIENT-11");
+        assertThat(patientCaptor.getValue().getEmrPatientId()).isEqualTo(11L);
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("SUCCESS");
+        assertThat(logCaptor.getValue().getSyncedCount()).isEqualTo(1);
+    }
+
+    @Test
     void shouldUpdateExistingEmrRecordsOnRepeatSync() {
         when(emrAdapter.getSourceType()).thenReturn("EMR");
         when(emrAdapter.fetchLabOrders(null)).thenReturn(List.of());
@@ -249,6 +286,36 @@ class SyncOrchestratorServiceTest {
         assertThat(logCaptor.getValue().getStatus()).isEqualTo("FAILED");
         assertThat(logCaptor.getValue().getSyncedCount()).isZero();
         assertThat(logCaptor.getValue().getErrorMessage()).contains("patient is missing");
+    }
+
+    @Test
+    void shouldSkipEncounterWithoutExternalId() {
+        when(emrAdapter.getSourceType()).thenReturn("EMR");
+        when(emrAdapter.fetchLabOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchLabResults(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingReports(null)).thenReturn(List.of());
+        when(emrAdapter.fetchPatients(null)).thenReturn(List.of());
+        when(emrAdapter.fetchEncounters(null)).thenReturn(List.of(Map.of("patientId", 11L, "encounterType", "门诊")));
+        when(dataStandardizer.normalize(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new NormalizedSyncPayload(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(Map.of("patientId", 11L, "encounterType", "门诊"))
+            ));
+
+        orchestratorService.syncSource(emrAdapter, null);
+
+        verify(encounterMapper, never()).insert(any(Encounter.class));
+        verify(encounterMapper, never()).updateById(any(Encounter.class));
+        ArgumentCaptor<DataSyncLog> logCaptor = ArgumentCaptor.forClass(DataSyncLog.class);
+        verify(dataSyncLogMapper).insert(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("FAILED");
+        assertThat(logCaptor.getValue().getSyncedCount()).isZero();
+        assertThat(logCaptor.getValue().getErrorMessage()).contains("missing external encounter id");
     }
 
     @Test
