@@ -3,6 +3,7 @@ package com.medical360.integration.mapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -70,6 +71,7 @@ public class FieldMappingService {
         VALUE_CONVERTERS.put("patientId", "Long");
         VALUE_CONVERTERS.put("labOrderId", "Long");
         VALUE_CONVERTERS.put("departmentId", "Long");
+        VALUE_CONVERTERS.put("birthDate", "LocalDate");
         VALUE_CONVERTERS.put("orderDatetime", "LocalDateTime");
         VALUE_CONVERTERS.put("resultDatetime", "LocalDateTime");
         VALUE_CONVERTERS.put("reportDatetime", "LocalDateTime");
@@ -126,6 +128,7 @@ public class FieldMappingService {
         try {
             return switch (type) {
                 case "Long" -> Long.parseLong(strValue);
+                case "LocalDate" -> parseDate(strValue);
                 case "LocalDateTime" -> parseDateTime(strValue);
                 case "BigDecimal" -> new BigDecimal(strValue);
                 default -> value;
@@ -145,6 +148,22 @@ public class FieldMappingService {
         for (String pattern : patterns) {
             try {
                 return LocalDateTime.parse(value, DateTimeFormatter.ofPattern(pattern));
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
+    }
+
+    private LocalDate parseDate(String value) {
+        String[] patterns = {
+            "yyyy-MM-dd",
+            "yyyy/MM/dd",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss"
+        };
+        for (String pattern : patterns) {
+            try {
+                return LocalDate.parse(value, DateTimeFormatter.ofPattern(pattern));
             } catch (Exception ignored) {
             }
         }
