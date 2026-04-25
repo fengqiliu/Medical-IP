@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class Encounter {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long emrEncounterId;
     private Long patientId;
     private String encounterType;
     private Long departmentId;

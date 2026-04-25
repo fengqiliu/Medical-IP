@@ -24,8 +24,10 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -112,7 +114,12 @@ class SyncOrchestratorServiceTest {
                 ))
             ));
         when(patientMapper.selectOne(any())).thenReturn(null);
-        when(encounterMapper.selectById(21L)).thenReturn(null);
+        when(encounterMapper.selectOne(any())).thenReturn(null);
+        doAnswer(invocation -> {
+            Patient patient = invocation.getArgument(0);
+            patient.setId(101L);
+            return 1;
+        }).when(patientMapper).insert(any(Patient.class));
 
         orchestratorService.syncSource(emrAdapter, null);
 
@@ -123,10 +130,12 @@ class SyncOrchestratorServiceTest {
         inOrder.verify(patientMapper).insert(patientCaptor.capture());
         inOrder.verify(encounterMapper).insert(encounterCaptor.capture());
         inOrder.verify(dataSyncLogMapper).insert(logCaptor.capture());
-        assertThat(patientCaptor.getValue().getId()).isEqualTo(11L);
+        assertThat(patientCaptor.getValue().getId()).isEqualTo(101L);
+        assertThat(patientCaptor.getValue().getEmrPatientId()).isEqualTo(11L);
         assertThat(patientCaptor.getValue().getUnifiedPatientId()).isEqualTo("P11");
-        assertThat(encounterCaptor.getValue().getId()).isEqualTo(21L);
-        assertThat(encounterCaptor.getValue().getPatientId()).isEqualTo(11L);
+        assertThat(encounterCaptor.getValue().getId()).isNull();
+        assertThat(encounterCaptor.getValue().getEmrEncounterId()).isEqualTo(21L);
+        assertThat(encounterCaptor.getValue().getPatientId()).isEqualTo(101L);
         assertThat(logCaptor.getValue().getStatus()).isEqualTo("SUCCESS");
         assertThat(logCaptor.getValue().getSyncedCount()).isEqualTo(2);
     }
@@ -150,20 +159,29 @@ class SyncOrchestratorServiceTest {
                 List.of(Map.of("id", 21L, "patientId", 11L, "encounterType", "住院"))
             ));
         Patient existingPatient = new Patient();
-        existingPatient.setId(11L);
+        existingPatient.setId(100L);
+        existingPatient.setEmrPatientId(11L);
         existingPatient.setUnifiedPatientId("P11");
         when(patientMapper.selectOne(any())).thenReturn(existingPatient);
         Encounter existingEncounter = new Encounter();
-        existingEncounter.setId(21L);
-        existingEncounter.setPatientId(11L);
-        when(encounterMapper.selectById(21L)).thenReturn(existingEncounter);
+        existingEncounter.setId(200L);
+        existingEncounter.setEmrEncounterId(21L);
+        existingEncounter.setPatientId(100L);
+        when(encounterMapper.selectOne(any())).thenReturn(existingEncounter);
 
         orchestratorService.syncSource(emrAdapter, null);
 
         verify(patientMapper, never()).insert(any(Patient.class));
         verify(encounterMapper, never()).insert(any(Encounter.class));
-        verify(patientMapper).updateById(any(Patient.class));
-        verify(encounterMapper).updateById(any(Encounter.class));
+        ArgumentCaptor<Patient> patientCaptor = ArgumentCaptor.forClass(Patient.class);
+        ArgumentCaptor<Encounter> encounterCaptor = ArgumentCaptor.forClass(Encounter.class);
+        verify(patientMapper).updateById(patientCaptor.capture());
+        verify(encounterMapper).updateById(encounterCaptor.capture());
+        assertThat(patientCaptor.getValue().getId()).isEqualTo(100L);
+        assertThat(patientCaptor.getValue().getEmrPatientId()).isEqualTo(11L);
+        assertThat(encounterCaptor.getValue().getId()).isEqualTo(200L);
+        assertThat(encounterCaptor.getValue().getEmrEncounterId()).isEqualTo(21L);
+        assertThat(encounterCaptor.getValue().getPatientId()).isEqualTo(100L);
     }
 
 
@@ -189,12 +207,16 @@ class SyncOrchestratorServiceTest {
         existingPatient.setId(99L);
         existingPatient.setUnifiedPatientId("P11");
         when(patientMapper.selectOne(any())).thenReturn(existingPatient);
-        when(encounterMapper.selectById(21L)).thenReturn(null);
+        when(encounterMapper.selectOne(any())).thenReturn(null);
 
         orchestratorService.syncSource(emrAdapter, null);
 
+        ArgumentCaptor<Patient> patientCaptor = ArgumentCaptor.forClass(Patient.class);
         ArgumentCaptor<Encounter> encounterCaptor = ArgumentCaptor.forClass(Encounter.class);
+        verify(patientMapper).updateById(patientCaptor.capture());
         verify(encounterMapper).insert(encounterCaptor.capture());
+        assertThat(patientCaptor.getValue().getId()).isEqualTo(99L);
+        assertThat(patientCaptor.getValue().getEmrPatientId()).isEqualTo(11L);
         assertThat(encounterCaptor.getValue().getPatientId()).isEqualTo(99L);
     }
 
@@ -216,7 +238,7 @@ class SyncOrchestratorServiceTest {
                 List.of(),
                 List.of(Map.of("id", 21L, "patientId", 404L, "encounterType", "急诊"))
             ));
-        when(patientMapper.selectById(404L)).thenReturn(null);
+        when(patientMapper.selectOne(any())).thenReturn(null);
 
         orchestratorService.syncSource(emrAdapter, null);
 
@@ -224,7 +246,51 @@ class SyncOrchestratorServiceTest {
         verify(encounterMapper, never()).updateById(any(Encounter.class));
         ArgumentCaptor<DataSyncLog> logCaptor = ArgumentCaptor.forClass(DataSyncLog.class);
         verify(dataSyncLogMapper).insert(logCaptor.capture());
-        assertThat(logCaptor.getValue().getStatus()).isEqualTo("SUCCESS");
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("FAILED");
         assertThat(logCaptor.getValue().getSyncedCount()).isZero();
+        assertThat(logCaptor.getValue().getErrorMessage()).contains("patient is missing");
+    }
+
+    @Test
+    void shouldReportPartialFailureWithActualSyncedCountForEmrSync() {
+        when(emrAdapter.getSourceType()).thenReturn("EMR");
+        when(emrAdapter.fetchLabOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchLabResults(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingOrders(null)).thenReturn(List.of());
+        when(emrAdapter.fetchImagingReports(null)).thenReturn(List.of());
+        when(emrAdapter.fetchPatients(null)).thenReturn(List.of(Map.of("PATIENT_ID", "11"), Map.of("PATIENT_ID", "12")));
+        when(emrAdapter.fetchEncounters(null)).thenReturn(List.of(Map.of("ENCOUNTER_ID", "21")));
+        when(dataStandardizer.normalize(any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(new NormalizedSyncPayload(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                    Map.of("id", 11L, "unifiedPatientId", "P11", "name", "李四"),
+                    Map.of("id", 12L, "unifiedPatientId", "P12", "name", "坏数据")
+                ),
+                List.of(Map.of("id", 21L, "patientId", 11L, "encounterType", "门诊"))
+            ));
+        when(patientMapper.selectOne(any())).thenReturn(null);
+        when(encounterMapper.selectOne(any())).thenReturn(null);
+        doAnswer(invocation -> {
+            Patient patient = invocation.getArgument(0);
+            if (Long.valueOf(12L).equals(patient.getEmrPatientId())) {
+                throw new IllegalStateException("duplicate key on patient");
+            }
+            patient.setId(101L);
+            return 1;
+        }).when(patientMapper).insert(any(Patient.class));
+
+        orchestratorService.syncSource(emrAdapter, null);
+
+        verify(patientMapper, times(2)).insert(any(Patient.class));
+        verify(encounterMapper).insert(any(Encounter.class));
+        ArgumentCaptor<DataSyncLog> logCaptor = ArgumentCaptor.forClass(DataSyncLog.class);
+        verify(dataSyncLogMapper).insert(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("PARTIAL_FAILED");
+        assertThat(logCaptor.getValue().getSyncedCount()).isEqualTo(2);
+        assertThat(logCaptor.getValue().getErrorMessage()).contains("duplicate key on patient");
     }
 }

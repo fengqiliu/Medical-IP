@@ -1,6 +1,7 @@
 -- 患者主索引
 CREATE TABLE patient (
     id BIGSERIAL PRIMARY KEY,
+    emr_patient_id BIGINT UNIQUE,
     unified_patient_id VARCHAR(64) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
     gender VARCHAR(10),
@@ -14,6 +15,7 @@ CREATE TABLE patient (
 -- 就诊记录
 CREATE TABLE encounter (
     id BIGSERIAL PRIMARY KEY,
+    emr_encounter_id BIGINT UNIQUE,
     patient_id BIGINT NOT NULL REFERENCES patient(id),
     encounter_type VARCHAR(20) NOT NULL,
     department_id BIGINT,
@@ -165,7 +167,9 @@ CREATE TABLE data_sync_log (
 
 -- 索引
 CREATE INDEX idx_patient_unified_id ON patient(unified_patient_id);
+CREATE INDEX idx_patient_emr_patient_id ON patient(emr_patient_id);
 CREATE INDEX idx_encounter_patient ON encounter(patient_id);
+CREATE INDEX idx_encounter_emr_encounter_id ON encounter(emr_encounter_id);
 CREATE INDEX idx_lab_order_patient ON lab_order(patient_id);
 CREATE INDEX idx_lab_order_encounter ON lab_order(encounter_id);
 CREATE INDEX idx_imaging_order_patient ON imaging_order(patient_id);

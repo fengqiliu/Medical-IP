@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,10 +44,29 @@ public class SyncOrchestratorService {
                 adapter.fetchEncounters(lastSyncTime)
             );
 
-            int syncedCount = "EMR".equals(sourceType)
-                ? syncEmrPayload(payload)
-                : countNormalizedRecords(payload);
+            if ("EMR".equals(sourceType)) {
+                EmrSyncResult result = syncEmrPayload(payload);
+                String status = result.errors().isEmpty()
+                    ? "SUCCESS"
+                    : result.syncedCount() > 0 ? "PARTIAL_FAILED" : "FAILED";
+                String errorMessage = summarizeErrors(result.errors());
 
+                if (result.errors().isEmpty()) {
+                    log.info("source={} sync succeeded, synced records={}", sourceType, result.syncedCount());
+                } else {
+                    log.warn(
+                        "source={} sync completed with status={}, synced records={}, errors={}",
+                        sourceType,
+                        status,
+                        result.syncedCount(),
+                        result.errors().size()
+                    );
+                }
+                saveLog(sourceType, status, errorMessage, lastSyncTime, result.syncedCount());
+                return;
+            }
+
+            int syncedCount = countNormalizedRecords(payload);
             log.info("source={} sync succeeded, normalized records={}", sourceType, syncedCount);
             saveLog(sourceType, "SUCCESS", null, lastSyncTime, syncedCount);
         } catch (Exception e) {
@@ -55,17 +75,12 @@ public class SyncOrchestratorService {
         }
     }
 
-    private int syncEmrPayload(NormalizedSyncPayload payload) {
-        int syncedCount =
-            payload.labOrders().size() +
-                payload.labResults().size() +
-                payload.imagingOrders().size() +
-                payload.imagingReports().size();
-
-        Map<Long, Long> patientIdMappings = syncPatients(payload.patients());
-        syncedCount += payload.patients().size();
-        syncedCount += syncEncounters(payload.encounters(), patientIdMappings);
-        return syncedCount;
+    private EmrSyncResult syncEmrPayload(NormalizedSyncPayload payload) {
+        List<String> errors = new ArrayList<>();
+        PatientSyncResult patientSyncResult = syncPatients(payload.patients(), errors);
+        int syncedCount = patientSyncResult.syncedCount()
+            + syncEncounters(payload.encounters(), patientSyncResult.patientIdMappings(), errors);
+        return new EmrSyncResult(syncedCount, errors);
     }
 
     private int countNormalizedRecords(NormalizedSyncPayload payload) {
@@ -77,30 +92,47 @@ public class SyncOrchestratorService {
             payload.encounters().size();
     }
 
-    private Map<Long, Long> syncPatients(List<Map<String, Object>> patients) {
+    private PatientSyncResult syncPatients(List<Map<String, Object>> patients, List<String> errors) {
         Map<Long, Long> patientIdMappings = new HashMap<>();
+        int syncedCount = 0;
         for (Map<String, Object> record : patients) {
-            Patient patient = toPatient(record);
-            Long sourcePatientId = patient.getId();
-            Patient existing = findExistingPatient(patient);
-            if (existing == null) {
-                patientMapper.insert(patient);
-                if (sourcePatientId != null && patient.getId() != null) {
-                    patientIdMappings.put(sourcePatientId, patient.getId());
+            try {
+                Patient patient = toPatient(record);
+                Long sourcePatientId = patient.getEmrPatientId();
+                Patient existing = findExistingPatient(patient);
+                if (existing == null) {
+                    patient.setId(null);
+                    patientMapper.insert(patient);
+                    if (sourcePatientId != null && patient.getId() != null) {
+                        patientIdMappings.put(sourcePatientId, patient.getId());
+                    }
+                } else {
+                    patient.setId(existing.getId());
+                    patientMapper.updateById(patient);
+                    if (sourcePatientId != null) {
+                        patientIdMappings.put(sourcePatientId, existing.getId());
+                    }
                 }
-                continue;
-            }
-
-            patient.setId(existing.getId());
-            patientMapper.updateById(patient);
-            if (sourcePatientId != null) {
-                patientIdMappings.put(sourcePatientId, existing.getId());
+                syncedCount++;
+            } catch (Exception e) {
+                Long sourcePatientId = getLong(record, "id");
+                log.warn("Skipping EMR patient sync, patientId={}, reason={}", sourcePatientId, e.getMessage());
+                errors.add("patient externalId=" + sourcePatientId + ": " + e.getMessage());
             }
         }
-        return patientIdMappings;
+        return new PatientSyncResult(patientIdMappings, syncedCount);
     }
 
     private Patient findExistingPatient(Patient patient) {
+        if (patient.getEmrPatientId() != null) {
+            Patient existing = patientMapper.selectOne(
+                new LambdaQueryWrapper<Patient>()
+                    .eq(Patient::getEmrPatientId, patient.getEmrPatientId())
+            );
+            if (existing != null) {
+                return existing;
+            }
+        }
         if (hasText(patient.getUnifiedPatientId())) {
             Patient existing = patientMapper.selectOne(
                 new LambdaQueryWrapper<Patient>()
@@ -110,43 +142,70 @@ public class SyncOrchestratorService {
                 return existing;
             }
         }
-        return patient.getId() == null ? null : patientMapper.selectById(patient.getId());
+        return null;
     }
 
-    private int syncEncounters(List<Map<String, Object>> encounters, Map<Long, Long> patientIdMappings) {
+    private int syncEncounters(List<Map<String, Object>> encounters, Map<Long, Long> patientIdMappings, List<String> errors) {
         int syncedCount = 0;
         for (Map<String, Object> record : encounters) {
-            Encounter encounter = toEncounter(record);
-            Long sourcePatientId = encounter.getPatientId();
-            encounter.setPatientId(resolvePatientId(sourcePatientId, patientIdMappings));
-            boolean patientResolvedInSync = sourcePatientId != null && patientIdMappings.containsKey(sourcePatientId);
-            if (encounter.getPatientId() == null || (!patientResolvedInSync && patientMapper.selectById(encounter.getPatientId()) == null)) {
-                log.warn("Skipping EMR encounter sync because patient is missing, encounterId={}, patientId={}", encounter.getId(), encounter.getPatientId());
-                continue;
-            }
+            try {
+                Encounter encounter = toEncounter(record);
+                Long sourceEncounterId = encounter.getEmrEncounterId();
+                Long sourcePatientId = encounter.getPatientId();
+                encounter.setPatientId(resolvePatientId(sourcePatientId, patientIdMappings));
+                if (encounter.getPatientId() == null) {
+                    String error = "encounter externalId=" + sourceEncounterId + ": patient is missing for external patientId=" + sourcePatientId;
+                    log.warn("Skipping EMR encounter sync because patient is missing, encounterId={}, patientId={}", sourceEncounterId, sourcePatientId);
+                    errors.add(error);
+                    continue;
+                }
 
-            Encounter existing = encounter.getId() == null ? null : encounterMapper.selectById(encounter.getId());
-            if (existing == null) {
-                encounterMapper.insert(encounter);
-            } else {
-                encounter.setId(existing.getId());
-                encounterMapper.updateById(encounter);
+                Encounter existing = findExistingEncounter(encounter);
+                if (existing == null) {
+                    encounter.setId(null);
+                    encounterMapper.insert(encounter);
+                } else {
+                    encounter.setId(existing.getId());
+                    encounterMapper.updateById(encounter);
+                }
+                syncedCount++;
+            } catch (Exception e) {
+                Long sourceEncounterId = getLong(record, "id");
+                log.warn("Skipping EMR encounter sync, encounterId={}, reason={}", sourceEncounterId, e.getMessage());
+                errors.add("encounter externalId=" + sourceEncounterId + ": " + e.getMessage());
             }
-            syncedCount++;
         }
         return syncedCount;
     }
 
-    private Long resolvePatientId(Long patientId, Map<Long, Long> patientIdMappings) {
-        if (patientId == null) {
+    private Encounter findExistingEncounter(Encounter encounter) {
+        if (encounter.getEmrEncounterId() == null) {
             return null;
         }
-        return patientIdMappings.getOrDefault(patientId, patientId);
+        return encounterMapper.selectOne(
+            new LambdaQueryWrapper<Encounter>()
+                .eq(Encounter::getEmrEncounterId, encounter.getEmrEncounterId())
+        );
+    }
+
+    private Long resolvePatientId(Long emrPatientId, Map<Long, Long> patientIdMappings) {
+        if (emrPatientId == null) {
+            return null;
+        }
+        Long mappedPatientId = patientIdMappings.get(emrPatientId);
+        if (mappedPatientId != null) {
+            return mappedPatientId;
+        }
+        Patient existing = patientMapper.selectOne(
+            new LambdaQueryWrapper<Patient>()
+                .eq(Patient::getEmrPatientId, emrPatientId)
+        );
+        return existing == null ? null : existing.getId();
     }
 
     private Patient toPatient(Map<String, Object> record) {
         Patient patient = new Patient();
-        patient.setId(getLong(record, "id"));
+        patient.setEmrPatientId(getLong(record, "id"));
         patient.setUnifiedPatientId(getString(record, "unifiedPatientId"));
         patient.setName(getString(record, "name"));
         patient.setGender(getString(record, "gender"));
@@ -159,13 +218,20 @@ public class SyncOrchestratorService {
 
     private Encounter toEncounter(Map<String, Object> record) {
         Encounter encounter = new Encounter();
-        encounter.setId(getLong(record, "id"));
+        encounter.setEmrEncounterId(getLong(record, "id"));
         encounter.setPatientId(getLong(record, "patientId"));
         encounter.setEncounterType(getString(record, "encounterType"));
         encounter.setDepartmentId(getLong(record, "departmentId"));
         encounter.setVisitDatetime((LocalDateTime) record.get("visitDatetime"));
         encounter.setAdmissionReason(getString(record, "admissionReason"));
         return encounter;
+    }
+
+    private String summarizeErrors(List<String> errors) {
+        if (errors.isEmpty()) {
+            return null;
+        }
+        return String.join("; ", errors.stream().limit(5).toList());
     }
 
     private Long getLong(Map<String, Object> record, String key) {
@@ -197,5 +263,11 @@ public class SyncOrchestratorService {
         logRecord.setErrorMessage(error);
         logRecord.setSyncedCount(syncedCount);
         dataSyncLogMapper.insert(logRecord);
+    }
+
+    private record PatientSyncResult(Map<Long, Long> patientIdMappings, int syncedCount) {
+    }
+
+    private record EmrSyncResult(int syncedCount, List<String> errors) {
     }
 }

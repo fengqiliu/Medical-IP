@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class Patient {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long emrPatientId;
     private String unifiedPatientId;
     private String name;
     private String gender;
