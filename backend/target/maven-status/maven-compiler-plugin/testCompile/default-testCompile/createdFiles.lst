@@ -1,0 +1,7 @@
+com/medical360/service/ImagingServiceTest.class
+com/medical360/integration/sync/SyncOrchestratorServiceTest.class
+com/medical360/security/PermissionServiceTest.class
+com/medical360/service/LabServiceTest.class
+com/medical360/integration/mapper/DataStandardizerTest.class
+com/medical360/service/AuthServiceTest.class
+com/medical360/security/JwtTokenProviderTest.class
