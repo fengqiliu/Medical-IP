@@ -1,0 +1,39 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/medical360
+    username: postgres
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  scheduling:
+    enabled: true
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.medical360.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+jwt:
+  secret: ${JWT_SECRET:medical360-dev-secret}
+  # JWT expiration time in milliseconds (86400000ms = 24 hours)
+  expiration: 86400000
+
+ai-service:
+  base-url: http://localhost:8000
+
+lis-service:
+  base-url: ${LIS_SERVICE_BASE_URL:http://localhost:9000}
+ris-service:
+  base-url: ${RIS_SERVICE_BASE_URL:http://localhost:9001}
+pacs-service:
+  base-url: ${PACS_SERVICE_BASE_URL:http://localhost:9002}
+emr-service:
+  base-url: ${EMR_SERVICE_BASE_URL:http://localhost:9003}

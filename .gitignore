@@ -1,0 +1,57 @@
+# Java / Maven / Spring Boot
+target/
+*.class
+*.jar
+*.war
+*.ear
+.settings/
+.project
+.classpath
+*.iml
+*.iws
+*.ipr
+.idea/
+*.log
+logs/
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+.eslintcache
+pnpm-lock.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE (VSCode)
+.vscode/settings.json
+
+# Claude Code
+.claude/
+.worktrees/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+data/
+
+# Temp
+tmp/
+temp/
+*.swp
+*.swo
+*~
+
+# Python (if AI service)
+__pycache__/
+*.pyc
+.venv/
+venv/
