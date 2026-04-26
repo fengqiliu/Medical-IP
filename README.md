@@ -21,6 +21,7 @@
 ## 功能特性
 
 **Phase 1 — 临床医技核心**
+
 - **患者360视图**：整合患者所有检验和影像数据，一站式查看
 - **时间线展示**：按时间轴展示患者历次就诊、检验、影像检查事件
 - **检验报告查看**：检验项目结果展示，含参考值对比和异常标识
@@ -30,6 +31,7 @@
 - **访问审计**：完整的操作审计日志，记录所有数据访问
 
 **Phase 2 — 系统管理**
+
 - **用户管理**：系统用户创建、编辑、启用/禁用、密码重置
 - **角色管理**：角色创建与编辑，支持菜单级权限分配
 - **部门管理**：医院部门/科室维护
@@ -38,13 +40,13 @@
 
 ## 技术栈
 
-| 层级     | 技术                                                            |
-| -------- | --------------------------------------------------------------- |
-| 前端     | React 18, TypeScript 5.3, Vite 5, Ant Design 5, Zustand 4        |
-| 后端     | Spring Boot 3.2.3, Java 17, Spring Security, MyBatis-Plus 3.5.5 |
-| AI 服务  | FastAPI, LangChain, OpenAI GPT-3.5-turbo, Pydantic v2            |
-| 数据库   | PostgreSQL 14+, Redis 6+                                         |
-| 认证     | JWT (jjwt 0.12.5), 24小时过期，行级数据权限                        |
+| 层级    | 技术                                                            |
+| ------- | --------------------------------------------------------------- |
+| 前端    | React 18, TypeScript 5.3, Vite 5, Ant Design 5, Zustand 4       |
+| 后端    | Spring Boot 3.2.3, Java 17, Spring Security, MyBatis-Plus 3.5.5 |
+| AI 服务 | FastAPI, LangChain, OpenAI GPT-3.5-turbo, Pydantic v2           |
+| 数据库  | PostgreSQL 14+, Redis 6+                                        |
+| 认证    | JWT (jjwt 0.12.5), 24小时过期，行级数据权限                     |
 
 ## 快速开始
 
@@ -111,103 +113,69 @@ npm run dev
 
 ```
 medical-360/
-├── frontend/
-│   ├── src/
-│   │   ├── api/              # API 请求层 (axios 实例 + 各模块接口)
-│   │   ├── components/       # 可复用组件
-│   │   │   └── Layout/       #   应用布局 (AppLayout: Sidebar + Header)
-│   │   ├── pages/            # 页面组件
-│   │   │   ├── Login/        #   登录页
-│   │   │   ├── Dashboard/    #   工作台仪表盘
-│   │   │   ├── Patient360/   #   患者360视图
-│   │   │   ├── Timeline/     #   患者时间线
-│   │   │   ├── LabDetail/    #   检验详情
-│   │   │   ├── ImagingDetail/#   影像详情
-│   │   │   └── System/       #   系统管理 (Phase 2)
-│   │   ├── stores/           # Zustand 状态管理 (authStore)
-│   │   └── types/            # TypeScript 类型定义
-│   ├── vite.config.ts        # Vite 配置 (proxy /api → :8080)
-│   └── package.json
-│
-├── backend/
-│   ├── src/main/java/com/medical360/
-│   │   ├── common/           # Result<T> 统一响应, PageResult
-│   │   ├── config/           # Spring 配置 (SecurityFilterChain, CORS, RestTemplate)
-│   │   ├── controller/       # REST 控制器 (Auth, Patient, Timeline, System)
-│   │   ├── dto/              # 数据传输对象
-│   │   ├── entity/           # 数据库实体 (MyBatis-Plus 注解)
-│   │   ├── handler/          # GlobalExceptionHandler 全局异常处理
-│   │   ├── integration/      # 外部系统接入层
-│   │   │   ├── adapter/      #   数据源适配器 (LIS/RIS/PACS/EMR)
-│   │   │   ├── mapper/       #   数据标准化 (FieldMappingService + DataStandardizer)
-│   │   │   └── sync/         #   同步编排 (SyncOrchestratorService + DataSyncScheduler)
-│   │   ├── mapper/           # MyBatis Mapper 接口
-│   │   ├── security/         # JWT 认证 (JwtTokenProvider, JwtAuthenticationFilter)
-│   │   │                    #   数据权限 (DataPermissionInterceptor, PermissionService)
-│   │   └── service/          # 业务服务层
-│   └── pom.xml
-│
-└── ai-service/
-    ├── app/
-    │   ├── models/           # Pydantic 请求模型 (LabSummaryRequest, ImagingSummaryRequest)
-    │   ├── routers/          # FastAPI 路由 (lab/summary, imaging/summary)
-    │   └── services/         # LLM 服务 (ChatOpenAI 调用, Prompt 构建)
-    ├── config.py             # 环境变量读取 (OPENAI_API_KEY 等)
-    └── requirements.txt
+├── frontend/               # React 18 + TypeScript + Vite (端口 3000)
+├── backend/                # Spring Boot 3.2.3 + Java 17 (端口 8080)
+├── ai-service/             # FastAPI + LangChain (端口 8000)
+└── docs/                   # 设计规格与实施计划
 ```
+
+> **注意**: main 分支使用 sparse-checkout 仅包含 Phase 2 系统管理模块。完整代码在 `feature/integration-skeleton` 分支。
 
 ## API 接口
 
 ### 后端 API (端口 8080)
 
 #### 认证
-| 方法   | 路径              | 说明             |
-| ------ | ----------------- | ---------------- |
-| POST   | `/api/auth/login` | 用户登录，返回 JWT |
-| GET    | `/api/auth/current` | 获取当前用户信息 |
-| POST   | `/api/auth/logout`  | 登出             |
+
+| 方法 | 路径                | 说明               |
+| ---- | ------------------- | ------------------ |
+| POST | `/api/auth/login`   | 用户登录，返回 JWT |
+| GET  | `/api/auth/current` | 获取当前用户信息   |
+| POST | `/api/auth/logout`  | 登出               |
 
 #### 临床数据
-| 方法   | 路径                          | 说明             |
-| ------ | ----------------------------- | ---------------- |
-| GET    | `/api/patient/360/{patientId}` | 患者360视图      |
-| GET    | `/api/timeline/{patientId}`    | 患者时间线       |
+
+| 方法 | 路径                           | 说明        |
+| ---- | ------------------------------ | ----------- |
+| GET  | `/api/patient/360/{patientId}` | 患者360视图 |
+| GET  | `/api/timeline/{patientId}`    | 患者时间线  |
 
 #### 系统管理 (Phase 2)
-| 方法     | 路径                              | 说明             |
-| -------- | --------------------------------- | ---------------- |
-| GET/POST | `/api/system/users`               | 用户列表 / 创建   |
-| GET/PUT/DELETE | `/api/system/users/{id}`      | 用户详情/更新/删除 |
-| PUT      | `/api/system/users/{id}/password`  | 重置密码          |
-| PUT      | `/api/system/users/{id}/enabled`   | 启用/禁用用户     |
-| GET      | `/api/system/users/all`            | 全部用户（下拉选择）|
-| GET/POST | `/api/system/roles`               | 角色列表 / 创建   |
-| GET/PUT/DELETE | `/api/system/roles/{id}`      | 角色详情/更新/删除 |
-| GET/POST | `/api/system/departments`         | 部门列表 / 创建   |
-| GET/PUT/DELETE | `/api/system/departments/{id}` | 部门详情/更新/删除 |
-| GET/POST | `/api/system/positions`           | 岗位列表 / 创建   |
-| GET/PUT/DELETE | `/api/system/positions/{id}`  | 岗位详情/更新/删除 |
-| GET      | `/api/system/access-logs`         | 访问日志查询      |
+
+| 方法           | 路径                              | 说明                 |
+| -------------- | --------------------------------- | -------------------- |
+| GET/POST       | `/api/system/users`               | 用户列表 / 创建      |
+| GET/PUT/DELETE | `/api/system/users/{id}`          | 用户详情/更新/删除   |
+| PUT            | `/api/system/users/{id}/password` | 重置密码             |
+| PUT            | `/api/system/users/{id}/enabled`  | 启用/禁用用户        |
+| GET            | `/api/system/users/all`           | 全部用户（下拉选择） |
+| GET/POST       | `/api/system/roles`               | 角色列表 / 创建      |
+| GET/PUT/DELETE | `/api/system/roles/{id}`          | 角色详情/更新/删除   |
+| GET/POST       | `/api/system/departments`         | 部门列表 / 创建      |
+| GET/PUT/DELETE | `/api/system/departments/{id}`    | 部门详情/更新/删除   |
+| GET/POST       | `/api/system/positions`           | 岗位列表 / 创建      |
+| GET/PUT/DELETE | `/api/system/positions/{id}`      | 岗位详情/更新/删除   |
+| GET            | `/api/system/access-logs`         | 访问日志查询         |
 
 ### AI 服务 API (端口 8000)
 
-| 方法   | 路径                  | 说明               |
-| ------ | --------------------- | ------------------ |
-| POST   | `/lab/summary`        | 生成检验结果 AI 摘要 |
-| POST   | `/imaging/summary`    | 生成影像报告 AI 摘要 |
-| GET    | `/health`             | 健康检查            |
+| 方法 | 路径               | 说明                 |
+| ---- | ------------------ | -------------------- |
+| POST | `/lab/summary`     | 生成检验结果 AI 摘要 |
+| POST | `/imaging/summary` | 生成影像报告 AI 摘要 |
+| GET  | `/health`          | 健康检查             |
 
 ## 前端路由
 
-| 路径                     | 页面           | 权限    |
-| ------------------------ | -------------- | ------- |
-| `/login`                 | 登录页         | 公开    |
-| `/dashboard`             | 工作台仪表盘   | 需登录  |
-| `/patient360/:patientId` | 患者360视图    | 需登录  |
-| `/timeline/:patientId`   | 患者时间线     | 需登录  |
-| `/lab/:orderId`          | 检验详情       | 需登录  |
-| `/imaging/:orderId`      | 影像详情       | 需登录  |
-| `/system/*`              | 系统管理       | 管理员  |
+| 路径                     | 页面         | 权限   |
+| ------------------------ | ------------ | ------ |
+| `/login`                 | 登录页       | 公开   |
+| `/dashboard`             | 工作台仪表盘 | 需登录 |
+| `/patient360/:patientId` | 患者360视图  | 需登录 |
+| `/timeline/:patientId`   | 患者时间线   | 需登录 |
+| `/lab/:orderId`          | 检验详情     | 需登录 |
+| `/imaging/:orderId`      | 影像详情     | 需登录 |
+| `/system/*`              | 系统管理     | 管理员 |
 
 ## 认证与数据权限
 
@@ -244,6 +212,7 @@ medical-360/
 ### 后端 (application.yml)
 
 通过 Spring Boot 配置文件或环境变量设置：
+
 - `spring.datasource.*` — PostgreSQL 连接信息
 - `spring.data.redis.*` — Redis 连接信息
 - `JWT_SECRET` — JWT 签名密钥
@@ -266,23 +235,23 @@ VITE_API_BASE_URL=/api
 
 ## 数据模型
 
-| 表名              | 说明           |
-| ----------------- | -------------- |
-| `patient`         | 患者基本信息   |
-| `encounter`       | 就诊记录       |
-| `lab_order`       | 检验医嘱       |
-| `lab_result`      | 检验结果明细   |
-| `imaging_order`   | 影像检查医嘱   |
-| `imaging_report`  | 影像报告       |
-| `clinical_event`  | 临床事件时间线 |
-| `department`      | 部门/科室      |
-| `position`        | 岗位/职位      |
-| `users`           | 系统用户       |
-| `role`            | 角色           |
-| `user_role`       | 用户-角色关联  |
-| `role_menu`       | 角色-菜单权限  |
-| `access_log`      | 访问审计日志   |
-| `data_sync_log`   | 数据同步日志   |
+| 表名             | 说明           |
+| ---------------- | -------------- |
+| `patient`        | 患者基本信息   |
+| `encounter`      | 就诊记录       |
+| `lab_order`      | 检验医嘱       |
+| `lab_result`     | 检验结果明细   |
+| `imaging_order`  | 影像检查医嘱   |
+| `imaging_report` | 影像报告       |
+| `clinical_event` | 临床事件时间线 |
+| `department`     | 部门/科室      |
+| `position`       | 岗位/职位      |
+| `users`          | 系统用户       |
+| `role`           | 角色           |
+| `user_role`      | 用户-角色关联  |
+| `role_menu`      | 角色-菜单权限  |
+| `access_log`     | 访问审计日志   |
+| `data_sync_log`  | 数据同步日志   |
 
 ## 外部系统接入
 

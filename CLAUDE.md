@@ -8,17 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库结构
 
-主工作树 (main branch) 使用 sparse-checkout，仅包含 Phase 2 系统管理模块。完整代码位于 git worktree：
-
 ```
-.worktrees/integration-skeleton/   # feature/integration-skeleton 分支，完整项目
-├── frontend/                      # React 18 + TypeScript + Vite
-├── backend/                       # Spring Boot 3.2.3 + Java 17
-├── ai-service/                    # FastAPI + LangChain AI 摘要服务
-└── docs/                          # 设计规格与实施计划
+frontend/                      # React 18 + TypeScript + Vite
+backend/                       # Spring Boot 3.2.3 + Java 17
+ai-service/                    # FastAPI + LangChain AI 摘要服务
+docs/                          # 设计规格与实施计划
 ```
 
-**开发时请先 `cd .worktrees/integration-skeleton`**，除非明确只需修改系统管理模块。
+**注意**: main 分支使用 sparse-checkout 仅包含 Phase 2 系统管理模块。完整代码在 `feature/integration-skeleton` 分支。
 
 ## 开发命令
 
@@ -116,6 +113,7 @@ main.tsx (BrowserRouter + ConfigProvider)
 ### API 约定
 
 所有后端端点返回 `Result<T>`：
+
 ```json
 { "code": 200, "message": "success", "data": { ... } }
 ```
