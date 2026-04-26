@@ -4,129 +4,145 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-医技影像平台是一个临床医技360全景系统，用于整合患者的检验、影像等医技数据，提供统一的数据查看和 AI 辅助摘要功能。
+医技影像平台 (Clinical Medical 360° Panorama Platform) — 整合患者检验、影像等医技数据，提供统一数据查看和 AI 辅助摘要。
 
-## 目录结构
+## 仓库结构
+
+主工作树 (main branch) 使用 sparse-checkout，仅包含 Phase 2 系统管理模块。完整代码位于 git worktree：
 
 ```
-├── frontend/          # React 18 + TypeScript + Vite 前端
-├── backend/           # Spring Boot 3.2.3 + Java 17 后端
-├── ai-service/        # FastAPI + LangChain AI 摘要服务
-└── docs/              # 文档（设计规格等）
+.worktrees/integration-skeleton/   # feature/integration-skeleton 分支，完整项目
+├── frontend/                      # React 18 + TypeScript + Vite
+├── backend/                       # Spring Boot 3.2.3 + Java 17
+├── ai-service/                    # FastAPI + LangChain AI 摘要服务
+└── docs/                          # 设计规格与实施计划
 ```
+
+**开发时请先 `cd .worktrees/integration-skeleton`**，除非明确只需修改系统管理模块。
 
 ## 开发命令
-
-### 前端 (frontend/)
-
-```bash
-npm install          # 安装依赖
-npm run dev          # 开发模式 (Vite dev server)
-npm run build        # 生产构建 (TypeScript 编译 + Vite build)
-npm run preview      # 预览生产构建
-```
 
 ### 后端 (backend/)
 
 ```bash
-mvn clean package    # 构建 JAR
-mvn spring-boot:run  # 运行 Spring Boot 应用
-mvn test             # 运行测试
+cd backend
+mvn clean package                  # 构建 JAR → target/medical-360-backend-1.0.0.jar
+mvn spring-boot:run                # 运行 (端口 8080)
+mvn test                           # 运行全部测试
+mvn test -Dtest=PatientServiceTest # 运行单个测试类
+mvn test -Dtest=PatientServiceTest#testMethod  # 运行单个测试方法
+
+# 环境依赖：PostgreSQL 14+ (localhost:5432/medical360), Redis 6+
+# 初始化 SQL：backend/src/main/resources/sql/init.sql
+# 默认测试用户：doctor1 / 123456
+```
+
+### 前端 (frontend/)
+
+```bash
+cd frontend
+npm install                        # 安装依赖
+npm run dev                        # Vite dev server (端口 3000, proxy /api → :8080)
+npm run build                      # 生产构建 (tsc + vite build)
+npm run preview                    # 预览生产构建
 ```
 
 ### AI 服务 (ai-service/)
 
 ```bash
-pip install -r requirements.txt  # 安装 Python 依赖
-python -m app.main               # 运行 FastAPI 服务 (端口 8000)
+cd ai-service
+cp .env.example .env               # 编辑填入 OPENAI_API_KEY
+pip install -r requirements.txt
+python -m app.main                 # 启动 (端口 8000)
+# 无认证保护，仅内部网络访问
 ```
 
 ## 技术栈
 
-### 前端
-
-- React 18 + TypeScript + Vite
-- React Router 6 (路由)
-- Ant Design 5 (UI 组件库)
-- Zustand (状态管理)
-- Axios (HTTP 客户端)
-- 路径别名：`@/*` 指向 `src/*`
-
-### 后端
-
-- Spring Boot 3.2.3 (Java 17)
-- Spring Security + JWT (认证授权)
-- MyBatis-Plus 3.5.5 (ORM)
-- PostgreSQL (数据库)
-- Redis (缓存/会话)
-- 数据权限拦截器 (`DataPermissionInterceptor`) 实现行级访问控制
-
-### AI 服务
-
-- FastAPI + Uvicorn
-- LangChain + OpenAI GPT-3.5-turbo
-- Pydantic v2 (数据验证)
+| 层级   | 关键技术                                                                    |
+| ------ | --------------------------------------------------------------------------- |
+| 前端   | React 18, TypeScript 5.3 (strict), Vite 5, Ant Design 5, Zustand 4, Axios   |
+| 后端   | Spring Boot 3.2.3, Java 17, Spring Security, MyBatis-Plus 3.5.5, JWT (jjwt) |
+| 数据库 | PostgreSQL, Redis                                                           |
+| AI     | FastAPI, LangChain, OpenAI GPT-3.5-turbo, Pydantic v2                       |
 
 ## 核心架构
 
-### 认证流程
-
-1. 前端登录获取 JWT token，存储于 localStorage
-2. 请求头携带 `Authorization: Bearer <token>`
-3. 后端 `JwtAuthenticationFilter` 验证 token
-4. `DataPermissionInterceptor` 在查询时注入数据权限条件
-
-### API 路由结构
-
-**后端 (8080端口)**
-
-- `/api/auth/*` - 认证相关
-- `/api/patient/*` - 患者360视图
-- `/api/timeline/*` - 患者时间线
-- `/api/lab/*` - 检验详情
-- `/api/imaging/*` - 影像详情
-
-**AI 服务 (8000端口)**
-
-- `POST /imaging/summary` - 影像报告 AI 摘要
-- `POST /lab/summary` - 检验结果 AI 摘要
-
-### 前端路由
+### 后端分层
 
 ```
-/login           # 登录页
-/dashboard       # 工作台仪表盘
-/patient360/:patientId   # 患者360视图
-/timeline/:patientId     # 患者时间线
-/lab/:orderId    # 检验详情
-/imaging/:orderId # 影像详情
+Controller → Service (接口) → ServiceImpl → MyBatis Mapper → PostgreSQL
+     ↓
+Result<T> 统一响应封装 (code, message, data)
+
+SecurityFilterChain:
+  JwtAuthenticationFilter → DataPermissionInterceptor → Controller
 ```
 
-## 数据模型
+- `controller/` — REST 控制器，返回 `Result<T>`
+- `service/` + `service/impl/` — 业务逻辑，接口与实现分离
+- `mapper/` — MyBatis-Plus `BaseMapper` 接口，优先用内置 query 方法再手写 SQL
+- `entity/` — 数据库实体，`@TableName` + `@TableId` 注解
+- `dto/` — API 请求/响应 DTO，使用 `@Builder` + `@Data`
+- `common/` — `Result<T>` 和 `PageResult` 统一响应
+- `security/` — JWT 认证 (`JwtTokenProvider`, `JwtAuthenticationFilter`) + 数据权限 (`DataPermissionInterceptor`, `PermissionService`)
+- `integration/` — 外部数据源接入层：
+  - `adapter/` — `DataSourceAdapter` 接口 + LIS/RIS/PACS/EMR 适配器实现
+  - `mapper/` — `DataStandardizer` + `FieldMappingService` 数据标准化
+  - `sync/` — `SyncOrchestratorService` 编排 + `DataSyncScheduler` 定时同步
+- `handler/` — `GlobalExceptionHandler` 全局异常处理
+- `config/` — Spring 配置类 (CORS, Security, RestTemplate)
 
-### 后端核心实体
+### 前端分层
 
-- `User` / `Role` - 用户角色体系
-- `Patient` / `Encounter` - 患者与就诊
-- `LabOrder` / `LabResult` - 检验医嘱与结果
-- `ImagingOrder` / `ImagingReport` - 影像医嘱与报告
-- `ClinicalEvent` - 临床事件时间线
-- `AccessLog` - 访问审计日志
+```
+main.tsx (BrowserRouter + ConfigProvider)
+  └── App.tsx (路由定义, PublicRoute/PrivateRoute 守卫)
+      └── AppLayout (Ant Design Layout: Sidebar + Header + Content/Outlet)
+          ├── pages/Dashboard/
+          ├── pages/Patient360/:patientId
+          ├── pages/Timeline/:patientId
+          ├── pages/LabDetail/:orderId
+          └── pages/ImagingDetail/:orderId
+```
 
-### AI 服务模型
+- `api/` — Axios 实例 (`@/api/index.ts`)：baseURL `/api`, JWT 拦截器, 401 重定向
+- `stores/` — Zustand store (`authStore.ts`)：token/user 持久化到 localStorage
+- `pages/` — 页面组件，每页面一个 `*/index.tsx`
+- `components/` — 可复用组件 (PatientHeader, Timeline, AISummaryCard, LabResultTable, ImagingReportCard, AbnormalTag)
+- `types/` — TypeScript 类型定义，按域拆分
+- 路径别名 `@/*` → `src/*` (tsconfig.json + vite.config.ts 同步配置)
 
-- `LabSummaryRequest` - 检验摘要请求
-- `ImagingSummaryRequest` - 影像摘要请求
+### API 约定
 
-## 环境配置
+所有后端端点返回 `Result<T>`：
+```json
+{ "code": 200, "message": "success", "data": { ... } }
+```
 
-- 前端：`.env.example` → 复制为 `.env.local`
-- AI 服务：`.env.example` → 复制为 `.env`，配置 `OPENAI_API_KEY`
-- 后端：Spring Boot 配置 via `application.yml` 或环境变量
+前端 Axios 拦截器自动从 `response.data.data` 提取数据。
+错误通过 `Result.error("ERROR_CODE")` 返回，由 `GlobalExceptionHandler` 统一捕获包装。
 
-## 注意事项
+### 认证与权限
 
-- 前端 API 请求通过代理 `/api` 转发至后端 (Vite proxy 配置)
-- 后端 CORS 配置允许前端 origin 访问
-- AI 服务无认证保护，部署时需注意网络安全
-- 路径别名 `@/*` 在 `tsconfig.json` 和 `vite.config.ts` 中配置一致
+1. 前端登录 → `POST /api/auth/login` → 后端验证 → 返回 JWT (24小时过期)
+2. JWT 存储于 localStorage，Axios 拦截器注入 `Authorization: Bearer <token>`
+3. `JwtAuthenticationFilter` 解析 token，设置 SecurityContext (username + roles)
+4. `DataPermissionInterceptor` 拦截 `/api/patient/*` 路径，校验行级权限
+5. `AccessLogService` (异步) 记录所有数据访问事件到 `access_log` 表
+
+## 数据模型 (14 张表)
+
+`patient`, `encounter`, `lab_order`, `lab_result`, `imaging_order`, `imaging_report`, `clinical_event`, `department`, `position`, `users`, `role`, `user_role`, `role_menu`, `access_log`, `data_sync_log`
+
+## 环境变量
+
+- 后端: `application.yml` (数据源、Redis、JWT_SECRET、外部服务 URL)
+- 前端: `frontend/.env.example` → `.env.local`
+- AI: `ai-service/.env.example` → `.env` (OPENAI_API_KEY, OPENAI_BASE_URL, MODEL_NAME)
+
+## 可用 Claude Code Agents
+
+- **backend-dev** — Spring Boot 后端开发 (Controller→Service→Mapper 分层，JWT 集成，DTO 设计)
+- **frontend-dev** — React/TypeScript 前端开发 (页面、组件、API 集成、Zustand 状态管理)
+- **medical-imaging-reviewer** — 安全/代码审查 (OWASP Top 10, 患者数据隐私, API 集成验证)

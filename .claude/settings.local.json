@@ -22,7 +22,8 @@
       "Bash(mvn test *)",
       "Bash(npm test *)",
       "Bash(grep \"\\\\.tsx$\")",
-      "Bash(xargs -I{} basename {})"
+      "Bash(xargs -I{} basename {})",
+      "Bash(grep -v \"^$\")"
     ]
   },
   "prefersReducedMotion": true
