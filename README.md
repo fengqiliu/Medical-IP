@@ -103,7 +103,7 @@ AI 服务启动于 http://localhost:8000
 ```bash
 cd frontend
 
-npm install
+npm ci
 npm run dev
 ```
 
@@ -118,8 +118,6 @@ medical-360/
 ├── ai-service/             # FastAPI + LangChain (端口 8000)
 └── docs/                   # 设计规格与实施计划
 ```
-
-> **注意**: main 分支使用 sparse-checkout 仅包含 Phase 2 系统管理模块。完整代码在 `feature/integration-skeleton` 分支。
 
 ## API 接口
 
@@ -175,7 +173,7 @@ medical-360/
 | `/timeline/:patientId`   | 患者时间线   | 需登录 |
 | `/lab/:orderId`          | 检验详情     | 需登录 |
 | `/imaging/:orderId`      | 影像详情     | 需登录 |
-| `/system/*`              | 系统管理     | 管理员 |
+| `/system`                | 系统管理     | 需登录（角色授权待实现） |
 
 ## 认证与数据权限
 
@@ -215,9 +213,9 @@ medical-360/
 
 - `spring.datasource.*` — PostgreSQL 连接信息
 - `spring.data.redis.*` — Redis 连接信息
-- `JWT_SECRET` — JWT 签名密钥
+- `JWT_SECRET` — JWT 签名密钥；生产环境必须显式设置为随机且至少 32 字节的值。配置文件中的默认值仅供本地开发使用
 - `AI_SERVICE_URL` — AI 服务地址 (默认 `http://localhost:8000`)
-- `LIS_URL`, `RIS_URL`, `PACS_URL`, `EMR_URL` — 外部系统地址
+- `LIS_SERVICE_BASE_URL`, `RIS_SERVICE_BASE_URL`, `PACS_SERVICE_BASE_URL`, `EMR_SERVICE_BASE_URL` — 外部系统地址
 
 ### AI 服务 (.env)
 

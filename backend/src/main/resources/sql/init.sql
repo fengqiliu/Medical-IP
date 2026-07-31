@@ -181,15 +181,39 @@ CREATE INDEX idx_access_log_user ON access_log(user_id);
 CREATE INDEX idx_access_log_patient ON access_log(patient_id);
 CREATE INDEX idx_data_sync_log_source ON data_sync_log(source_type);
 
--- 添加测试用户（密码为 123456 的 BCrypt 哈希）
-INSERT INTO users (username, password, name, department_id, position_id, enabled)
-VALUES ('doctor1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '张医生', 1, 1, true);
-
 -- 添加默认角色
 INSERT INTO role (name, description) VALUES ('CLINICIAN', '临床医生');
 INSERT INTO role (name, description) VALUES ('TECHNICIAN', '医技医生');
 INSERT INTO role (name, description) VALUES ('DEPT_ADMIN', '科室管理员');
 INSERT INTO role (name, description) VALUES ('SYS_ADMIN', '系统管理员');
 
+-- 添加默认科室和岗位
+INSERT INTO department (name) VALUES ('内科');
+INSERT INTO position (name, department_id, data_scope)
+SELECT '临床医生', id, 'DEPT'
+FROM department
+WHERE name = '内科'
+ORDER BY id
+LIMIT 1;
+
+-- 添加测试用户（密码为 123456 的 BCrypt 哈希）
+INSERT INTO users (username, password, name, department_id, position_id, enabled)
+SELECT
+    'doctor1',
+    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi',
+    '张医生',
+    d.id,
+    p.id,
+    true
+FROM department d
+JOIN position p ON p.department_id = d.id
+WHERE d.name = '内科' AND p.name = '临床医生'
+ORDER BY d.id, p.id
+LIMIT 1;
+
 -- 分配角色
-INSERT INTO user_role (user_id, role_id) VALUES (1, 1);
+INSERT INTO user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM users u
+CROSS JOIN role r
+WHERE u.username = 'doctor1' AND r.name = 'CLINICIAN';

@@ -6,6 +6,7 @@ import Patient360 from "@/pages/Patient360";
 import Timeline from "@/pages/Timeline";
 import LabDetail from "@/pages/LabDetail";
 import ImagingDetail from "@/pages/ImagingDetail";
+import System from "@/pages/System";
 import { useAuthStore } from "@/stores/authStore";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="timeline/:patientId" element={<Timeline />} />
         <Route path="lab/:orderId" element={<LabDetail />} />
         <Route path="imaging/:orderId" element={<ImagingDetail />} />
+        <Route path="system" element={<System />} />
       </Route>
     </Routes>
   );

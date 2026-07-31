@@ -16,9 +16,9 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public Result<String> login(@RequestBody LoginRequest request) {
+    public Result<LoginResponse> login(@RequestBody LoginRequest request) {
         String token = authService.login(request.getUsername(), request.getPassword());
-        return Result.success(token);
+        return Result.success(new LoginResponse(token));
     }
 
     @GetMapping("/current")
@@ -36,5 +36,8 @@ public class AuthController {
     public static class LoginRequest {
         private String username;
         private String password;
+    }
+
+    public record LoginResponse(String token) {
     }
 }

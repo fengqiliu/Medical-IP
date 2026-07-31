@@ -2,7 +2,6 @@ import { Layout, Menu } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   DashboardOutlined,
-  UserOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 
@@ -18,7 +17,6 @@ export default function AppSidebar({ collapsed }: Props) {
 
   const items = [
     { key: "/dashboard", icon: <DashboardOutlined />, label: "工作台" },
-    { key: "/patientSearch", icon: <UserOutlined />, label: "患者360" },
     { key: "/system", icon: <SettingOutlined />, label: "系统管理" },
   ];
 

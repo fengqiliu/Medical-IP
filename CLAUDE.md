@@ -15,8 +15,6 @@ ai-service/                    # FastAPI + LangChain AI 摘要服务
 docs/                          # 设计规格与实施计划
 ```
 
-**注意**: main 分支使用 sparse-checkout 仅包含 Phase 2 系统管理模块。完整代码在 `feature/integration-skeleton` 分支。
-
 ## 开发命令
 
 ### 后端 (backend/)
@@ -38,7 +36,7 @@ mvn test -Dtest=PatientServiceTest#testMethod  # 运行单个测试方法
 
 ```bash
 cd frontend
-npm install                        # 安装依赖
+npm ci                             # 按 package-lock.json 干净安装依赖
 npm run dev                        # Vite dev server (端口 3000, proxy /api → :8080)
 npm run build                      # 生产构建 (tsc + vite build)
 npm run preview                    # 预览生产构建
@@ -100,10 +98,11 @@ main.tsx (BrowserRouter + ConfigProvider)
           ├── pages/Patient360/:patientId
           ├── pages/Timeline/:patientId
           ├── pages/LabDetail/:orderId
-          └── pages/ImagingDetail/:orderId
+          ├── pages/ImagingDetail/:orderId
+          └── pages/System/
 ```
 
-- `api/` — Axios 实例 (`@/api/index.ts`)：baseURL `/api`, JWT 拦截器, 401 重定向
+- `api/` — Axios 实例 (`@/api/index.ts`)：baseURL 由 `VITE_API_BASE_URL` 配置（默认 `/api`），JWT 拦截器，401 重定向
 - `stores/` — Zustand store (`authStore.ts`)：token/user 持久化到 localStorage
 - `pages/` — 页面组件，每页面一个 `*/index.tsx`
 - `components/` — 可复用组件 (PatientHeader, Timeline, AISummaryCard, LabResultTable, ImagingReportCard, AbnormalTag)
@@ -118,8 +117,8 @@ main.tsx (BrowserRouter + ConfigProvider)
 { "code": 200, "message": "success", "data": { ... } }
 ```
 
-前端 Axios 拦截器自动从 `response.data.data` 提取数据。
-错误通过 `Result.error("ERROR_CODE")` 返回，由 `GlobalExceptionHandler` 统一捕获包装。
+前端 Axios 拦截器将 `AxiosResponse` 转为 `response.data`，保留 `Result<T>` 外层；调用方从其 `data` 字段读取业务数据。
+错误通过 `Result.error("ERROR_CODE")` 返回，由 `GlobalExceptionHandler` 统一捕获包装。当前拦截器仅按 HTTP 状态拒绝请求，尚未统一把非 200 的 `Result.code` 转为 rejected Promise。
 
 ### 认证与权限
 
